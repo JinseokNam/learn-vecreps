@@ -136,6 +136,61 @@ void Corpus::save_vocab(std::string vocab_save_filepath)
   file.close();
 }
 
+void Corpus::load_vocab(std::string vocab_load_filepath)
+{
+  std::ifstream file;
+  file.open(vocab_load_filepath);
+
+  CHECK(file.is_open()) << "Failed to open the file to load vocabulary";
+
+  std::string line;
+  std::vector<std::string> elems;
+  while(std::getline(file, line))
+  {
+    elems.clear();
+    std::stringstream ss(line);
+    std::string item;
+    while (std::getline(ss, item, '\t'))
+    {
+      elems.push_back(item);
+    }
+
+    CHECK(elems.size() == 2) << "Error to parse: " << line;
+
+    vocab_ptr pt(new Vocab(elems[0], std::stoi(elems[1]))); 
+    m_vocabulary.push_back(pt); 
+  }
+
+  file.close();
+
+  long long idx=0;
+
+  for (auto& x : m_vocabulary)
+  {
+    m_word2idx_map[x->m_word] = idx++;
+    m_train_words += x->m_freq;
+  }
+
+  // count the number of lines
+  m_corpus_file.open(m_corpus_filename.c_str(), std::ifstream::in);
+  if(!m_corpus_file.is_open()) 
+  {
+    std::stringstream ss;
+    ss << "[" << __FILE__ << ":" << __LINE__ << "] File not found to open: " << m_corpus_filename;
+    throw FileNotFoundException(ss.str());
+  }
+
+  LOG(INFO) << "Now counting the number of lines from " << m_corpus_filename;
+
+  long long num_lines_read = 0;
+  while(std::getline(m_corpus_file, line))
+  {
+    num_lines_read++;
+  }
+
+  m_num_lines = num_lines_read;
+}
+
 void Corpus::create_huffman_tree()
 {
   std::vector<int> frequencies;

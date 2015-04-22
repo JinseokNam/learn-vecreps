@@ -16,6 +16,7 @@ public:
   }
   void build_vocab();
   void save_vocab(std::string filepath);
+  void load_vocab(std::string filepath);
   void create_huffman_tree(); 
   std::string get_corpus_filename() const;
   long long get_vocabsize() const;
