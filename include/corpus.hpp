@@ -10,13 +10,13 @@ class Corpus
 {
 public:
   static Corpus& getCorpus(std::string corpus_filename)
-	{
+  {
     static Corpus instance(corpus_filename);
     return instance;
   }
-	void build_vocab();
-	void save_vocab(std::string filepath);
-	void create_huffman_tree();	
+  void build_vocab();
+  void save_vocab(std::string filepath);
+  void create_huffman_tree(); 
   std::string get_corpus_filename() const;
   long long get_vocabsize() const;
   long long get_num_lines() const;

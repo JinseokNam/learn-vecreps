@@ -55,23 +55,23 @@ void Corpus::build_vocab()
 {
   m_corpus_file.open(m_corpus_filename.c_str(), std::ifstream::in);
   if(!m_corpus_file.is_open()) 
-	{
+  {
     std::stringstream ss;
     ss << "[" << __FILE__ << ":" << __LINE__ << "] File not found to open: " << m_corpus_filename;
     throw FileNotFoundException(ss.str());
   }
 
-	LOG(INFO) << "Now building vocabulary from " << m_corpus_filename;
+  LOG(INFO) << "Now building vocabulary from " << m_corpus_filename;
 
   std::map<std::string, int> temp_vocab;
   std::string line;
   long long num_lines_read = 0;
   while(std::getline(m_corpus_file, line))
-	{
+  {
     num_lines_read++;
     std::vector<std::string> tokens = split(line.c_str(), ' ');
     for(std::vector<std::string>::iterator it = tokens.begin(); it != tokens.end(); ++it)
-		{
+    {
       std::map<std::string, int>::iterator map_it = temp_vocab.find(*it);
       if(map_it == temp_vocab.end()) temp_vocab[*it] = 0;
       temp_vocab[*it] += 1;
@@ -85,12 +85,12 @@ void Corpus::build_vocab()
   for (auto& x: temp_vocab)
   {
     if(x.second >= m_min_count)
-		{
+    {
       vocab_ptr pt(new Vocab(x.first, x.second));
       m_vocabulary.push_back(pt);
     }
-		else
-		{
+    else
+    {
       unk_counts++;
     }
   }
@@ -123,17 +123,17 @@ void Corpus::sortVocab()
 
 void Corpus::save_vocab(std::string vocab_save_filepath)
 {
-	std::ofstream file;
-	file.open(vocab_save_filepath);
+  std::ofstream file;
+  file.open(vocab_save_filepath);
 
-	CHECK(file.is_open()) << "Failed to open the file to store vocabulary";
+  CHECK(file.is_open()) << "Failed to open the file to store vocabulary";
 
   for (auto& x : m_vocabulary)
   {
     file << x->m_word << "\t" << x->m_freq << std::endl;
   }
 
-	file.close();
+  file.close();
 }
 
 void Corpus::create_huffman_tree()
@@ -143,12 +143,12 @@ void Corpus::create_huffman_tree()
   {
     frequencies.push_back(x->m_freq);
   }
-	LOG(INFO) << "Copied frequency distribution of words";
+  LOG(INFO) << "Copied frequency distribution of words";
 
   HuffmanTree ht(frequencies);
   ht.build_huffman_tree();
   //ht.display_huffman_tree();
-	LOG(INFO) << "Created huffman tree from " << m_corpus_filename;
+  LOG(INFO) << "Created huffman tree from " << m_corpus_filename;
 
   long long L = m_vocabulary.size();
   for(long long a = 0; a < L; a++) {

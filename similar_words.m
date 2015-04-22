@@ -25,28 +25,28 @@ function similar_words(model, word, vocab, topn)
 %
 %%
 
-	if nargin < 4
-		topn = 20;
-	end
+  if nargin < 4
+    topn = 20;
+  end
 
-	word_idx = -1;
-	for i = 1:length(vocab)
-		if strcmp(word,vocab{i})
-			word_idx = i;
-			break;
-		end	
-	end
-	if word_idx == -1
-		disp(['word [' word '] cannot be found in the vocabulary']);
-		return;
-	end
-	
-	similarity = sum(bsxfun(@times, model, model(:,word_idx)),1);
+  word_idx = -1;
+  for i = 1:length(vocab)
+    if strcmp(word,vocab{i})
+      word_idx = i;
+      break;
+    end 
+  end
+  if word_idx == -1
+    disp(['word [' word '] cannot be found in the vocabulary']);
+    return;
+  end
+  
+  similarity = sum(bsxfun(@times, model, model(:,word_idx)),1);
 
-	[sorted_similarity, ranking] = sort(similarity,'descend');
+  [sorted_similarity, ranking] = sort(similarity,'descend');
 
-	for k = 2:topn+1
-		fprintf(1,'%s\t%.4f\n', vocab{ranking(k)}, sorted_similarity(k));
-	end
+  for k = 2:topn+1
+    fprintf(1,'%s\t%.4f\n', vocab{ranking(k)}, sorted_similarity(k));
+  end
 
 end

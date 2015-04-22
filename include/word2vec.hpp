@@ -24,11 +24,11 @@ class Word2Vec
 {
 public:
   Word2Vec(Corpus &corpus,
-						long long wordvec_dim,
-						int window_size,
-						real learning_rate,
-						int use_skipgram,
-						int use_hs,
+            long long wordvec_dim,
+            int window_size,
+            real learning_rate,
+            int use_skipgram,
+            int use_hs,
             int negative,
             real sample,
             int num_iters,
@@ -37,7 +37,7 @@ public:
 
   ~Word2Vec();
   void start_train();
-	void save(std::string filepath);
+  void save(std::string filepath);
 
 private:
   Corpus &m_Corpus;

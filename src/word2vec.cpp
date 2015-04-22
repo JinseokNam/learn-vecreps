@@ -2,11 +2,11 @@
 #include "utils.hpp"
 
 Word2Vec::Word2Vec(Corpus &corpus,
-						long long wordvec_dim,
-						int window_size,
-						real learning_rate,
-						int use_skipgram,
-						int use_hs,
+            long long wordvec_dim,
+            int window_size,
+            real learning_rate,
+            int use_skipgram,
+            int use_hs,
             int negative,
             real sample,
             int num_iters,
@@ -48,7 +48,7 @@ void Word2Vec::start_train()
 
   boost::thread_group threads;
   for (int i = 0; i < m_num_threads; i++)
-	{
+  {
     threads.create_thread(boost::bind(&Word2Vec::run, this, i));
   }
   threads.join_all();
@@ -130,9 +130,9 @@ void Word2Vec::run(int thread_id)
 
   for(int iter = 0; iter < m_params.num_iters; ++iter)
   {
-  	file.open(m_Corpus.get_corpus_filename());
+    file.open(m_Corpus.get_corpus_filename());
 
-  	CHECK(file.is_open()) << "Failed to open the file: " << m_Corpus.get_corpus_filename();
+    CHECK(file.is_open()) << "Failed to open the file: " << m_Corpus.get_corpus_filename();
 
     long long inst_idx=0;
     std::string line;
@@ -166,12 +166,12 @@ void Word2Vec::run(int thread_id)
               sentences_seen_actual / (real) std::chrono::duration_cast<std::chrono::seconds>(now-m_start_time).count());
             fflush(stdout);
           }
-					lr = m_params.lr * ( 1 - sentences_seen_actual / (real) (M * m_params.num_iters));
-					if (lr < m_params.lr * 0.0001) lr = m_params.lr * 0.0001;
+          lr = m_params.lr * ( 1 - sentences_seen_actual / (real) (M * m_params.num_iters));
+          if (lr < m_params.lr * 0.0001) lr = m_params.lr * 0.0001;
         }
 
-				if(m_params.sg)
-				{
+        if(m_params.sg)
+        {
           // skip-gram, hierarchical softmax and/or negative sampling
           for(int pos=0; pos < (int) tokens.size(); ++pos)
           {
@@ -232,7 +232,7 @@ void Word2Vec::run(int thread_id)
               cblas_saxpy(m_params.d, 1, grad, 1, &U0[input_word_idx*m_params.d], 1);
             }
           }
-				}
+        }
         else
         {
           // continuous bag of words, hierarchical softmax and/or negative sampling
@@ -306,12 +306,12 @@ void Word2Vec::run(int thread_id)
         }
       }
     }
-  	file.close();
+    file.close();
   }
 
   delete[] grad;
   delete[] hid;
-	LOG(INFO) << "Thread " << thread_id << " has finished.";
+  LOG(INFO) << "Thread " << thread_id << " has finished.";
 }
 
 void Word2Vec::createTable()
@@ -329,7 +329,7 @@ void Word2Vec::createTable()
   {
     m_table[a] = i;
     if (a / (real)table_size > d1)
-		{
+    {
       i++;
       d1 += pow(m_vocabulary[i]->m_freq, power) / (real)train_words_pow;
     }
@@ -361,16 +361,16 @@ std::vector<std::string> Word2Vec::split(const std::string &s, char delim, real 
 
 void Word2Vec::save(std::string filepath)
 {
-	// TODO store a complete model
-	// At this stage, only word vectors are stored in a binary format.
-	std::ofstream file(filepath, std::ios::out | std::ios::binary);
+  // TODO store a complete model
+  // At this stage, only word vectors are stored in a binary format.
+  std::ofstream file(filepath, std::ios::out | std::ios::binary);
 
-	CHECK(file.is_open()) << "Failed to open the file: " << filepath;
+  CHECK(file.is_open()) << "Failed to open the file: " << filepath;
 
-	file.write((char *) &(m_params.d), sizeof(long long));
-	file.write((char *) &(m_params.V), sizeof(long long));
-	file.write((char *) U0.get(), m_params.d*m_params.V*sizeof(real));
-	file.close();
+  file.write((char *) &(m_params.d), sizeof(long long));
+  file.write((char *) &(m_params.V), sizeof(long long));
+  file.write((char *) U0.get(), m_params.d*m_params.V*sizeof(real));
+  file.close();
 
-	LOG(INFO) << "Model parameters are stored under the following path: " << filepath;
+  LOG(INFO) << "Model parameters are stored under the following path: " << filepath;
 }
