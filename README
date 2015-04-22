@@ -1,0 +1,14 @@
+Implementation of word2vec in C++
+
+Required external libraries
+- google log (glog)
+- OpenBLAS
+- Boost
+
+compiler
+- g++11
+
+References
+
+- Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. Distributed Representations of Words and Phrases and their Compositionality. In Proceedings of NIPS, 2013.
+- https://code.google.com/p/word2vec/
