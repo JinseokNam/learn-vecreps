@@ -7,18 +7,18 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   std::cout << "Testing Paragraph vectors" << std::endl;
-  std::string corpus_filepath("/data/Corpus/wikipedia_dump/en_extracted/AA/new_wikipedia_all_paragraphs.txt");
+  std::string corpus_filepath("/home/nam/codes/gensim_pipeline/new_wikipedia_all_paragraphs.txt");
   int vec_dim = 100;
   int window_size = 11;
   float learning_rate = 0.025;
   int dm = 0;
   int dbow = 1;
   int hs = 1;
-  int negative = 5;
+  int negative = 10;
   float sample = 1e-5;
 
-  int num_iters = 1;
-  int num_threads = 4;
+  int num_iters = 10;
+  int num_threads = 24;
 
   int verbose = 1;
 

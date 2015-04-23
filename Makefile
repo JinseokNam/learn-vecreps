@@ -1,9 +1,9 @@
 CC := g++ -std=c++11
 CC_OPTS := -O3
 CFLAGS := -c -Wall
-INC := -I/usr/local/include -I./include
-LIB := -L/usr/local/lib
-LDFLAGS := -lboost_thread -lboost_system -lglog -lopenblas
+INC := -I/usr/local/include -I/usr/include -I${HOME}/local/include -I./include
+LIB := -L/usr/local/lib -L/usr/lib -L${HOME}/local/lib
+LDFLAGS := -lboost_thread -lboost_system -lglog -lopenblas -lpthread
 SRCDIR := src
 BUILDDIR := bin
 EX_W2V_SRCDIR := examples/word2vec

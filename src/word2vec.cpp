@@ -149,7 +149,7 @@ void Word2Vec::run(int thread_id)
       while(1)
       {
         if(sentences_seen >= max_sentences) break;
-        std::getline(file, line);
+        if(!std::getline(file, line)) break;
 
         std::vector<std::string> tokens = split(line.c_str(), ' ', m_sample, next_random);
 
@@ -161,7 +161,7 @@ void Word2Vec::run(int thread_id)
           if (m_verbose)
           {
             std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-            fprintf(stdout,"%cAlpha: %f Progress: %.2f%% Instances/thread/sec: %.2f", 13, lr, 
+            fprintf(stdout,"%cAlpha: %f Progress: %.2f%% Instances/sec: %.2f", 13, lr, 
               sentences_seen_actual / (real)M * 100,
               sentences_seen_actual / (real) std::chrono::duration_cast<std::chrono::seconds>(now-m_start_time).count());
             fflush(stdout);

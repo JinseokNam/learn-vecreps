@@ -169,7 +169,7 @@ void Par2Vec::run(int thread_id)
       while(1)
       {
         if(sentences_seen >= max_sentences) break;
-        std::getline(file, line);
+        if(!std::getline(file, line)) break;
 
         std::vector<std::string> tokens = split(line.c_str(), ' ', m_sample, next_random);
 
@@ -181,7 +181,7 @@ void Par2Vec::run(int thread_id)
           if (m_verbose)
           {
             std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-            fprintf(stdout,"%cAlpha: %f Progress: %.2f%% Instances/thread/sec: %.2f", 13, lr, 
+            fprintf(stdout,"%cAlpha: %f Progress: %.2f%% Instances/sec: %.2f", 13, lr, 
               sentences_seen_actual / (real)M * 100,
               sentences_seen_actual / (real) std::chrono::duration_cast<std::chrono::seconds>(now-m_start_time).count());
             fflush(stdout);
@@ -191,6 +191,7 @@ void Par2Vec::run(int thread_id)
         }
 
         long long paragraph_idx = inst_idx + sentences_seen - 1;
+        CHECK(paragraph_idx >= 0 && paragraph_idx < M) << "Illegal index of paragraph: " << paragraph_idx << " out of " << M << " Thread id: " << thread_id;
 
         if(m_params.dm)
         {
@@ -202,7 +203,7 @@ void Par2Vec::run(int thread_id)
             for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
             {
               if (j == pos) continue;
-              if (j < 1 || j >= (int) tokens.size()) continue;
+              if (j < 0 || j >= (int) tokens.size()) continue;
               output_word_idx = m_Corpus.getIndexOf(tokens[j]);
               memset(grad, 0, m_params.d*sizeof(real));
               if (m_params.hs)
@@ -214,6 +215,7 @@ void Par2Vec::run(int thread_id)
                                               &D0[paragraph_idx*m_params.d], 1,
                                               &U1[inner_node_idx*m_params.d], 1)
                                   ); 
+                  CHECK(!isnan(f) && !isinf(f));
 
                   int code = m_vocabulary[output_word_idx]->get_codeAt(k);
                   real delta = (1 - code - f) * lr;
@@ -243,6 +245,7 @@ void Par2Vec::run(int thread_id)
                                               &D0[paragraph_idx*m_params.d], 1,
                                               &U2[target_word_idx*m_params.d], 1)
                                   ); 
+                  CHECK(!isnan(f) && !isinf(f));
 
                   real delta = (label - f) * lr;
                   cblas_saxpy(m_params.d, delta, &U2[target_word_idx*m_params.d], 1, grad, 1);
@@ -261,16 +264,17 @@ void Par2Vec::run(int thread_id)
             cblas_scopy(m_params.d, &D0[paragraph_idx*m_params.d], 1, hid, 1);
             long long output_word_idx = m_Corpus.getIndexOf(tokens[pos]);
             long long input_word_idx;
-            int num_components = 0;
+            int num_components = 1;
 
             for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
             {
               if (j == pos) continue;
-              if (j < 1 || j >= (int) tokens.size()) continue;
+              if (j < 0 || j >= (int) tokens.size()) continue;
               input_word_idx = m_Corpus.getIndexOf(tokens[j]);
               cblas_saxpy(m_params.d, 1, &U0[input_word_idx*m_params.d], 1, hid, 1);
               num_components++;
             }
+            cblas_sscal(m_params.d, 1/(real)num_components, hid, 1);
             memset(grad, 0, m_params.d*sizeof(real));
             if (m_params.hs)
             {
@@ -281,6 +285,7 @@ void Par2Vec::run(int thread_id)
                                             hid, 1,
                                             &U1[inner_node_idx*m_params.d], 1)
                                 ); 
+                CHECK(!isnan(f) && !isinf(f));
 
                 int code = m_vocabulary[output_word_idx]->get_codeAt(k);
                 real delta = (1 - code - f) * lr;
@@ -311,6 +316,7 @@ void Par2Vec::run(int thread_id)
                                             hid, 1,
                                             &U2[target_word_idx*m_params.d], 1)
                                 ); 
+                CHECK(!isnan(f) && !isinf(f));
 
                 real delta = (label - f) * lr;
                 cblas_saxpy(m_params.d, delta, &U2[target_word_idx*m_params.d], 1, grad, 1);
