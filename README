@@ -1,4 +1,4 @@
-Implementation of word2vec in C++
+Implementation of word2vec [1] and paragraph vectors [2] in C++
 
 Required external libraries
 - google log (glog)
@@ -10,5 +10,5 @@ compiler
 
 References
 
-- Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. Distributed Representations of Words and Phrases and their Compositionality. In Proceedings of NIPS, 2013.
-- https://code.google.com/p/word2vec/
+[1] Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. Distributed Representations of Words and Phrases and their Compositionality. NIPS, 2013.
+[2] Quoc V. Le and Tomas Mikolov, Distributed Representations of Sentences and Documents, ICML, 2014.
