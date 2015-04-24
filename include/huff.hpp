@@ -10,7 +10,7 @@ typedef struct hnode_ {
   long long key;
   int freq;
   long long internal_idx;
-  char codeword[MAX_CODEWORD];
+  std::vector<char> codeword;
   boost::shared_ptr<struct hnode_> left;
   boost::shared_ptr<struct hnode_> right;
 } Hnode;    // a node for huffman coding
@@ -39,7 +39,7 @@ public:
   long long getKeyOfNodeAt(long long i); 
   int getFreqOfNodeAt(long long i);
   long long getInternalIndexOfNodeAt(long long i);
-  char* getCodewordOfNodeAt(long long i);
+  const std::vector<char>& getCodewordOfNodeAt(long long i);
 
   std::vector<long long> traverseInnerNodesOf(long long i);
 

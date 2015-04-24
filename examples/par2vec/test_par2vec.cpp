@@ -36,11 +36,21 @@ int main(int argc, char* argv[])
   }
 
   Par2Vec model(corpus, vec_dim, window_size, learning_rate, dm, dbow, hs, negative, sample, num_iters, num_threads, verbose);
+
   model.start_train();
 
 	LOG(INFO) << "Training done!";
 
-	model.save(std::string("dbow_model_save.bin"));
+  {
+    const char* name = "par2vec_dbow_trained_model.bin";
+    std::ofstream out_stream(name);
+    //boost::archive::text_oarchive oar(out_stream);
+    boost::archive::binary_oarchive oar(out_stream);
+    oar << model;
+    out_stream.close();
+  }
+
+	model.export_vectors(std::string("dbow_word_paragraph_vectors.bin"));
 
   return 0;
 }

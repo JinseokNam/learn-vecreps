@@ -8,7 +8,6 @@ HuffmanTree::HuffmanTree(std::vector<int> &frequencies)
     hnode_ptr node(new Hnode());
     node->key = a;
     node->freq = frequencies[a];
-    memset(node->codeword,0,MAX_CODEWORD*sizeof(char));
     node->internal_idx = -1;
     node->left = NULL;
     node->right = NULL;
@@ -69,11 +68,9 @@ void HuffmanTree::build_huffman_tree()
 
 void HuffmanTree::generate_huffman_code(hnode_ptr root, std::stringstream &prefix)
 {
-  CHECK(prefix.str().size() < MAX_CODEWORD) 
-    << "Attempted to assign codeword length of " << prefix.str().size()
-    << " than MAXIMUM " << MAX_CODEWORD;
+  std::string prefix_str = prefix.str();
+  std::copy(prefix_str.begin(), prefix_str.end(), back_inserter(root->codeword));;
 
-  strcpy(root->codeword,prefix.str().c_str());
   if(root->left == NULL || root->right == NULL) return;
 
   std::stringstream left_prefix;
@@ -88,7 +85,8 @@ void HuffmanTree::generate_huffman_code(hnode_ptr root, std::stringstream &prefi
 void HuffmanTree::traverse_huffman_tree(hnode_ptr root)
 {
   if(root->key != -1) {
-    std::cout << root->key << ":" << root->freq << " " << root->codeword << " " << strlen(root->codeword) << std::endl;
+    std::string s = std::string(root->codeword.begin(), root->codeword.end());
+    std::cout << root->key << ":" << root->freq << " " << s << " " << s.size() << std::endl;
   } else {
     std::cout << "internal " << root->internal_idx << std::endl;
   }
@@ -119,7 +117,7 @@ long long HuffmanTree::getInternalIndexOfNodeAt(long long i)
   return m_hnodes[i]->internal_idx;
 }
 
-char* HuffmanTree::getCodewordOfNodeAt(long long i)
+const std::vector<char>& HuffmanTree::getCodewordOfNodeAt(long long i)
 {
   return m_hnodes[i]->codeword;
 }
@@ -128,7 +126,8 @@ std::vector<long long> HuffmanTree::traverseInnerNodesOf(long long i)
 {
   hnode_ptr start = m_tree_root;
   std::vector<long long> node_indices;
-  for(unsigned int b = 0; b < strlen(m_hnodes[i]->codeword); b++) {
+  for(unsigned int b = 0; b < m_hnodes[i]->codeword.size(); b++)
+  {
     CHECK_NE(start->internal_idx,-1);
 
     node_indices.push_back(start->internal_idx);

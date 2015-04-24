@@ -13,21 +13,35 @@ public:
   
   int get_codelen() const;
 
-  void set_codeword(char *codeword);
-  const char* get_codeword();
+  void set_codeword(std::vector<char> codeword);
   int get_codeAt(int i);
   
   void set_inner_node_idx(std::vector<long long> inner_node_idx);
-  const char* get_inner_node_idx();
   long long get_inner_node_idxAt(int i);
+
+  // testing purpose
+  std::string get_codeword();
+  std::string get_inner_node_idx();
 
 private:
   Vocab();
 
-  int m_codelen;
   std::vector<char> m_codes;
   std::vector<long long> m_inner_node_idx;
+
+  // Allow serialization to access non-public data members.  
+  friend class boost::serialization::access; 
+
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version)
+  {
+    ar & m_word;
+    ar & m_freq;
+    ar & m_codes;
+    ar & m_inner_node_idx;
+  }
 };
+
 
 class VocabComp
 {
