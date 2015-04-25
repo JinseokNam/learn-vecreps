@@ -18,7 +18,7 @@ Word2Vec::Word2Vec(Corpus &corpus,
         m_num_iters(num_iters),
         m_num_threads(num_threads),
         m_verbose(verbose),
-        sentences_seen_actual(0),
+        words_seen_actual(0),
         U0(NULL),
         U1(NULL),
         U2(NULL)
@@ -33,6 +33,8 @@ Word2Vec::Word2Vec(Corpus &corpus,
   m_params.sample = m_sample;
   m_params.negative = negative;
   m_params.num_iters = num_iters;
+
+  init();
 }
 
 Word2Vec::~Word2Vec()
@@ -42,8 +44,6 @@ Word2Vec::~Word2Vec()
 
 void Word2Vec::start_train()
 {
-  init();
-
   m_start_time = std::chrono::system_clock::now();
 
   boost::thread_group threads;
@@ -66,8 +66,8 @@ void Word2Vec::init()
   boost::variate_generator<boost::mt19937&, 
                            boost::normal_distribution<> > boost_randn(rng, nd);
 
-  U0.reset(new real [m_params.d * m_params.V]);
-  CHECK(U0) << "Memory allocation failed: " 
+  real *U0_ = new real [m_params.d * m_params.V];
+  CHECK(U0_) << "Memory allocation failed: " 
             << m_params.d << " x " 
             << m_params.V << " (" 
             << (m_params.d*m_params.V*sizeof(real)/(real)1000000) << " MB)";
@@ -76,12 +76,12 @@ void Word2Vec::init()
   {
     for(b = 0; b < m_params.d; b++)
     {
-      U0[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
+      U0_[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
     }
   }
 
-  U1.reset(new real [m_params.d*m_params.V]);
-  CHECK(U1) << "Memory allocation failed: " 
+  real *U1_ = new real [m_params.d*m_params.V];
+  CHECK(U1_) << "Memory allocation failed: " 
             << m_params.d << " x " 
             << m_params.V << " (" 
             << (m_params.d*m_params.V*sizeof(real)/(real)1000000) << " MB)";
@@ -90,12 +90,12 @@ void Word2Vec::init()
   {
     for(b = 0; b < m_params.d; b++)
     {
-      U1[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
+      U1_[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
     }
   }
 
-  U2.reset(new real [m_params.d*m_params.V]);
-  CHECK(U2) << "Memory allocation failed: " 
+  real *U2_ = new real [m_params.d*m_params.V];
+  CHECK(U2_) << "Memory allocation failed: " 
             << m_params.d << " x " 
             << m_params.V << " (" 
             << (m_params.d*m_params.V*sizeof(real)/(real)1000000) << " MB)";
@@ -104,9 +104,13 @@ void Word2Vec::init()
   {
     for(b = 0; b < m_params.d; b++)
     {
-      U2[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
+      U2_[b+a*m_params.d] = boost_randn()/sqrt(m_params.V);
     }
   }
+
+  U0.reset(U0_);
+  U1.reset(U1_);
+  U2.reset(U2_);
 
   createTable();
 }
@@ -122,133 +126,90 @@ void Word2Vec::run(int thread_id)
   real lr = m_params.lr;
   unsigned long long next_random = (long long) thread_id;
   const long long M = m_Corpus.get_num_lines();
-  const long long max_sentences = (long long) ceil(M/(real)m_num_threads);
-  long long sentences_seen,last_sentences_seen;
+  const long long total_num_words = m_Corpus.get_train_words();
+  const long long max_words = (long long) ceil(total_num_words/(real)m_num_threads);
+  long long words_seen,last_words_seen,sentences_seen;
+  long long base_sentence_idx, num_words_read;
 
   real* hid = new real[m_params.d];
   real* grad = new real[m_params.d];
+  real *U0_, *U1_, *U2_;
+
+  U0_ = U0.get();
+  U1_ = U1.get();
+  U2_ = U2.get();
+
+  file.open(m_Corpus.get_corpus_filename());
+
+  CHECK(file.is_open()) << "Failed to open the file: " << m_Corpus.get_corpus_filename();
+
+  base_sentence_idx=0;
+  num_words_read = 0;
+  std::string line;
+
+  while(1)
+  {
+    if((num_words_read >= max_words*thread_id) || base_sentence_idx >= M) break;
+    std::getline(file, line);
+    num_words_read += (std::count(line.begin(), line.end(), ' ') + 1);
+    ++base_sentence_idx;
+  }
+  file.close();
 
   for(int iter = 0; iter < m_params.num_iters; ++iter)
   {
     file.open(m_Corpus.get_corpus_filename());
-
-    CHECK(file.is_open()) << "Failed to open the file: " << m_Corpus.get_corpus_filename();
-
-    long long inst_idx=0;
-    std::string line;
+    num_words_read = 0;
+    num_words_read = 0;
+    long long sentence_count = 0;
     while(1)
     {
-      if((inst_idx == max_sentences*thread_id) || inst_idx >= M) break;
-      std::getline(file, line);
-      ++inst_idx;
+      if(sentence_count == base_sentence_idx) break;
+      if(!std::getline(file, line)) break;
+      sentence_count++; 
     }
-    LOG(INFO) << "Thread " << thread_id << " started after reading " << inst_idx << " lines at epoch " << iter + 1;
-    sentences_seen = 0; last_sentences_seen = 0;
-    if(max_sentences*thread_id < M)
+
+    //LOG(INFO) << "Thread " << thread_id << " started after reading " << inst_idx << " lines at epoch " << iter + 1;
+
+    words_seen = 0; last_words_seen = 0; sentences_seen = 0;
+    while(1)
     {
-      while(1)
+      if(words_seen >= max_words) break;
+      if(!std::getline(file, line)) break;
+
+      std::vector<std::string> tokens = split(line.c_str(), ' ', m_sample, next_random);
+
+      words_seen += (std::count(line.begin(), line.end(), ' ') + 1);
+      sentences_seen++;
+      if(words_seen - last_words_seen > 100000)
       {
-        if(sentences_seen >= max_sentences) break;
-        if(!std::getline(file, line)) break;
-
-        std::vector<std::string> tokens = split(line.c_str(), ' ', m_sample, next_random);
-
-        sentences_seen++;
-        if(sentences_seen - last_sentences_seen > 1000)
+        words_seen_actual += words_seen - last_words_seen;
+        last_words_seen = words_seen;
+        if (m_verbose)
         {
-          sentences_seen_actual += sentences_seen - last_sentences_seen;
-          last_sentences_seen = sentences_seen;
-          if (m_verbose)
-          {
-            std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-            fprintf(stdout,"%cAlpha: %f Progress: %.2f%% Instances/sec: %.2f", 13, lr, 
-              sentences_seen_actual / (real)M * 100,
-              sentences_seen_actual / (real) std::chrono::duration_cast<std::chrono::seconds>(now-m_start_time).count());
-            fflush(stdout);
-          }
-          lr = m_params.lr * ( 1 - sentences_seen_actual / (real) (M * m_params.num_iters));
-          if (lr < m_params.lr * 0.0001) lr = m_params.lr * 0.0001;
+          std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+          fprintf(stdout,"%cLearningRate: %f Progress: %.2f%% Processing words/sec: %.2f k", 13, lr, 
+            words_seen_actual / (real)total_num_words * 100,
+            words_seen_actual / (real) std::chrono::duration_cast<std::chrono::seconds>(now-m_start_time).count() / 1000.);
+          fflush(stdout);
         }
+        lr = m_params.lr * ( 1 - words_seen_actual / (real) (total_num_words * m_params.num_iters));
+        if (lr < m_params.lr * 0.0001) lr = m_params.lr * 0.0001;
+      }
 
-        if(m_params.sg)
+      if(m_params.sg)
+      {
+        // skip-gram, hierarchical softmax and/or negative sampling
+        for(int pos=0; pos < (int) tokens.size(); ++pos)
         {
-          // skip-gram, hierarchical softmax and/or negative sampling
-          for(int pos=0; pos < (int) tokens.size(); ++pos)
+          long long input_word_idx = m_Corpus.getIndexOf(tokens[pos]);
+          long long output_word_idx = -1;
+
+          for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
           {
-            long long input_word_idx = m_Corpus.getIndexOf(tokens[pos]);
-            long long output_word_idx = -1;
-
-            for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
-            {
-              if (j == pos) continue;
-              if (j < 0 || j >= (int) tokens.size()) continue;
-              output_word_idx = m_Corpus.getIndexOf(tokens[j]);
-              memset(grad, 0, m_params.d*sizeof(real));
-              if (m_params.hs)
-              {
-                for(int k = 0; k < m_vocabulary[output_word_idx]->get_codelen(); ++k)
-                {
-                  long long inner_node_idx = m_vocabulary[output_word_idx]->get_inner_node_idxAt(k);
-                  real f = sigmoid(cblas_sdot(m_params.d, 
-                                              &U0[input_word_idx*m_params.d], 1,
-                                              &U1[inner_node_idx*m_params.d], 1)
-                                  ); 
-
-                  int code = m_vocabulary[output_word_idx]->get_codeAt(k);
-                  real delta = (1 - code - f) * lr;
-                  cblas_saxpy(m_params.d, delta, &U1[inner_node_idx*m_params.d], 1, grad, 1);
-                  cblas_saxpy(m_params.d, delta, &U0[input_word_idx*m_params.d], 1, &U1[inner_node_idx*m_params.d], 1);
-                }
-              }
-              if (m_params.negative)
-              {
-                int label;
-                long long target_word_idx;
-                for(int k = 0; k < m_params.negative + 1; ++k)
-                {
-                  if (k == 0)
-                  {
-                    target_word_idx = input_word_idx;
-                    label = 1;
-                  }
-                  else
-                  {
-                    next_random = next_random * (unsigned long long)25214903917 + 11;
-                    target_word_idx = m_table[(next_random >> 16) % table_size];
-                    if (target_word_idx == 0) target_word_idx = next_random % (m_params.V - 1) + 1;
-                    if (target_word_idx == input_word_idx) continue;
-                    label = 0;
-                  }
-                  real f = sigmoid(cblas_sdot(m_params.d, 
-                                              &U0[input_word_idx*m_params.d], 1,
-                                              &U2[target_word_idx*m_params.d], 1)
-                                  ); 
-
-                  real delta = (label - f) * lr;
-                  cblas_saxpy(m_params.d, delta, &U2[target_word_idx*m_params.d], 1, grad, 1);
-                  cblas_saxpy(m_params.d, delta, &U0[input_word_idx*m_params.d], 1, &U2[target_word_idx*m_params.d], 1);
-                }
-              }
-              cblas_saxpy(m_params.d, 1, grad, 1, &U0[input_word_idx*m_params.d], 1);
-            }
-          }
-        }
-        else
-        {
-          // continuous bag of words, hierarchical softmax and/or negative sampling
-          for(int pos=0; pos < (int) tokens.size(); ++pos)
-          {
-            long long output_word_idx = m_Corpus.getIndexOf(tokens[pos]);
-            long long input_word_idx;
-
-            memset(hid, 0, m_params.d*sizeof(real));
-            for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
-            {
-              if (j == pos) continue;
-              if (j < 0 || j >= (int) tokens.size()) continue;
-              input_word_idx = m_Corpus.getIndexOf(tokens[j]);
-              cblas_saxpy(m_params.d, 1, &U0[input_word_idx*m_params.d], 1, hid, 1);
-            }
+            if (j == pos) continue;
+            if (j < 0 || j >= (int) tokens.size()) continue;
+            output_word_idx = m_Corpus.getIndexOf(tokens[j]);
             memset(grad, 0, m_params.d*sizeof(real));
             if (m_params.hs)
             {
@@ -256,14 +217,14 @@ void Word2Vec::run(int thread_id)
               {
                 long long inner_node_idx = m_vocabulary[output_word_idx]->get_inner_node_idxAt(k);
                 real f = sigmoid(cblas_sdot(m_params.d, 
-                                            hid, 1,
-                                            &U1[inner_node_idx*m_params.d], 1)
+                                            &U0_[input_word_idx*m_params.d], 1,
+                                            &U1_[inner_node_idx*m_params.d], 1)
                                 ); 
 
                 int code = m_vocabulary[output_word_idx]->get_codeAt(k);
                 real delta = (1 - code - f) * lr;
-                cblas_saxpy(m_params.d, delta, &U1[inner_node_idx*m_params.d], 1, grad, 1);
-                cblas_saxpy(m_params.d, delta, hid, 1, &U1[inner_node_idx*m_params.d], 1);
+                cblas_saxpy(m_params.d, delta, &U1_[inner_node_idx*m_params.d], 1, grad, 1);
+                cblas_saxpy(m_params.d, delta, &U0_[input_word_idx*m_params.d], 1, &U1_[inner_node_idx*m_params.d], 1);
               }
             }
             if (m_params.negative)
@@ -274,7 +235,7 @@ void Word2Vec::run(int thread_id)
               {
                 if (k == 0)
                 {
-                  target_word_idx = output_word_idx;
+                  target_word_idx = input_word_idx;
                   label = 1;
                 }
                 else
@@ -282,26 +243,91 @@ void Word2Vec::run(int thread_id)
                   next_random = next_random * (unsigned long long)25214903917 + 11;
                   target_word_idx = m_table[(next_random >> 16) % table_size];
                   if (target_word_idx == 0) target_word_idx = next_random % (m_params.V - 1) + 1;
-                  if (target_word_idx == output_word_idx) continue;
+                  if (target_word_idx == input_word_idx) continue;
                   label = 0;
                 }
                 real f = sigmoid(cblas_sdot(m_params.d, 
-                                            hid, 1,
-                                            &U2[target_word_idx*m_params.d], 1)
+                                            &U0_[input_word_idx*m_params.d], 1,
+                                            &U2_[target_word_idx*m_params.d], 1)
                                 ); 
 
                 real delta = (label - f) * lr;
-                cblas_saxpy(m_params.d, delta, &U2[target_word_idx*m_params.d], 1, grad, 1);
-                cblas_saxpy(m_params.d, delta, hid, 1, &U2[target_word_idx*m_params.d], 1);
+                cblas_saxpy(m_params.d, delta, &U2_[target_word_idx*m_params.d], 1, grad, 1);
+                cblas_saxpy(m_params.d, delta, &U0_[input_word_idx*m_params.d], 1, &U2_[target_word_idx*m_params.d], 1);
               }
             }
-            for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
+            cblas_saxpy(m_params.d, 1, grad, 1, &U0_[input_word_idx*m_params.d], 1);
+          }
+        }
+      }
+      else
+      {
+        // continuous bag of words, hierarchical softmax and/or negative sampling
+        for(int pos=0; pos < (int) tokens.size(); ++pos)
+        {
+          long long output_word_idx = m_Corpus.getIndexOf(tokens[pos]);
+          long long input_word_idx;
+
+          memset(hid, 0, m_params.d*sizeof(real));
+          for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
+          {
+            if (j == pos) continue;
+            if (j < 0 || j >= (int) tokens.size()) continue;
+            input_word_idx = m_Corpus.getIndexOf(tokens[j]);
+            cblas_saxpy(m_params.d, 1, &U0_[input_word_idx*m_params.d], 1, hid, 1);
+          }
+          memset(grad, 0, m_params.d*sizeof(real));
+          if (m_params.hs)
+          {
+            for(int k = 0; k < m_vocabulary[output_word_idx]->get_codelen(); ++k)
             {
-              if (j == pos) continue;
-              if (j < 0 || j >= (int) tokens.size()) continue;
-              input_word_idx = m_Corpus.getIndexOf(tokens[j]);
-              cblas_saxpy(m_params.d, 1, grad, 1, &U0[input_word_idx*m_params.d], 1);
+              long long inner_node_idx = m_vocabulary[output_word_idx]->get_inner_node_idxAt(k);
+              real f = sigmoid(cblas_sdot(m_params.d, 
+                                          hid, 1,
+                                          &U1_[inner_node_idx*m_params.d], 1)
+                              ); 
+
+              int code = m_vocabulary[output_word_idx]->get_codeAt(k);
+              real delta = (1 - code - f) * lr;
+              cblas_saxpy(m_params.d, delta, &U1_[inner_node_idx*m_params.d], 1, grad, 1);
+              cblas_saxpy(m_params.d, delta, hid, 1, &U1_[inner_node_idx*m_params.d], 1);
             }
+          }
+          if (m_params.negative)
+          {
+            int label;
+            long long target_word_idx;
+            for(int k = 0; k < m_params.negative + 1; ++k)
+            {
+              if (k == 0)
+              {
+                target_word_idx = output_word_idx;
+                label = 1;
+              }
+              else
+              {
+                next_random = next_random * (unsigned long long)25214903917 + 11;
+                target_word_idx = m_table[(next_random >> 16) % table_size];
+                if (target_word_idx == 0) target_word_idx = next_random % (m_params.V - 1) + 1;
+                if (target_word_idx == output_word_idx) continue;
+                label = 0;
+              }
+              real f = sigmoid(cblas_sdot(m_params.d, 
+                                          hid, 1,
+                                          &U2_[target_word_idx*m_params.d], 1)
+                              ); 
+
+              real delta = (label - f) * lr;
+              cblas_saxpy(m_params.d, delta, &U2_[target_word_idx*m_params.d], 1, grad, 1);
+              cblas_saxpy(m_params.d, delta, hid, 1, &U2_[target_word_idx*m_params.d], 1);
+            }
+          }
+          for(int j=pos-(m_params.wn)/2; j < pos+(m_params.wn)/2+1; ++j)
+          {
+            if (j == pos) continue;
+            if (j < 0 || j >= (int) tokens.size()) continue;
+            input_word_idx = m_Corpus.getIndexOf(tokens[j]);
+            cblas_saxpy(m_params.d, 1, grad, 1, &U0_[input_word_idx*m_params.d], 1);
           }
         }
       }
@@ -359,10 +385,20 @@ std::vector<std::string> Word2Vec::split(const std::string &s, char delim, real 
   return elems;
 }
 
-void Word2Vec::save(std::string filepath)
+std::vector<std::string> Word2Vec::split(const std::string &s, char delim)
 {
-  // TODO store a complete model
-  // At this stage, only word vectors are stored in a binary format.
+  std::vector<std::string> elems;
+  std::stringstream ss(s);
+  std::string item;
+  while (std::getline(ss, item, delim)) {
+    elems.push_back(item);
+  }
+  return elems;
+}
+
+void Word2Vec::export_vectors(std::string filepath)
+{
+  // store word vectors and paragraph vectors to the designated path
   std::ofstream file(filepath, std::ios::out | std::ios::binary);
 
   CHECK(file.is_open()) << "Failed to open the file: " << filepath;
@@ -370,6 +406,7 @@ void Word2Vec::save(std::string filepath)
   file.write((char *) &(m_params.d), sizeof(long long));
   file.write((char *) &(m_params.V), sizeof(long long));
   file.write((char *) U0.get(), m_params.d*m_params.V*sizeof(real));
+
   file.close();
 
   LOG(INFO) << "Model parameters are stored under the following path: " << filepath;

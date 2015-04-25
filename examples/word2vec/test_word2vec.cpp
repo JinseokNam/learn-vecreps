@@ -10,12 +10,12 @@ int main(int argc, char* argv[])
   int wordvec_dim = 100;
   int window_size = 11;
   float learning_rate = 0.025;
-  int skipgram = 0;
+  int skipgram = 1;
   int hs = 1;
-  int negative = 5;
+  int negative = 10;
   float sample = 1e-5;
 
-  int num_iters = 5;
+  int num_iters = 10;
   int num_threads = 4;
 
   int verbose = 1;
@@ -23,8 +23,11 @@ int main(int argc, char* argv[])
   Corpus &corpus = Corpus::getCorpus(corpus_filepath);
 
   try{
+    /*
     corpus.build_vocab();
 		corpus.save_vocab(std::string("cbow_vocab.txt"));
+    */
+		corpus.load_vocab(std::string("cbow_vocab.txt"));
     corpus.create_huffman_tree();
   } catch (std::exception& e) {
     LOG(FATAL) << e.what();
@@ -35,7 +38,15 @@ int main(int argc, char* argv[])
 
 	LOG(INFO) << "Training done!";
 
-	model.save(std::string("cbow_model_save.bin"));
+  {
+    const char* name = "word2vec_sg_trained_model.bin";
+    std::ofstream out_stream(name);
+    boost::archive::binary_oarchive oar(out_stream);
+    oar << model;
+    out_stream.close();
+  }
+
+	model.export_vectors(std::string("cbow_word_vectors_save.bin"));
 
   return 0;
 }
